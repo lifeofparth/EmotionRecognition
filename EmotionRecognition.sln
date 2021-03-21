@@ -1,0 +1,23 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30621.155
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "EmotionRecognition", "EmotionRecognition\EmotionRecognition.pyproj", "{DF803EA0-E006-4113-80AA-F344E69AA4EC}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{DF803EA0-E006-4113-80AA-F344E69AA4EC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DF803EA0-E006-4113-80AA-F344E69AA4EC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {4A2A3073-29D2-431F-8899-B9E0D5838506}
+	EndGlobalSection
+EndGlobal
