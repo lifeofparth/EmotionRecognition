@@ -15,11 +15,25 @@ def menu():
     return choice
 
 def show_image(emotion):
-    train_dir = '../../train'
+    if (int(emotion) == 1):
+        train_dir = '../train/angry'
+    elif (int(emotion) == 2):
+        train_dir = '../train/disgust'
+    elif (int(emotion) == 3):
+        train_dir = '../train/fear'
+    elif (int(emotion) == 4):
+        train_dir = '../train/happy'
+    elif (int(emotion) == 5):
+        train_dir = '../train/neutral'
+    elif (int(emotion) == 6):
+        train_dir = '../train/sad'
+    elif (int(emotion) == 7):
+        train_dir = '../train/surprise'
+
     files = []
-    for dirname, dirs, filenames in os.walk(train_dir, topdown=True):
-        for filename in filenames:
-            files.append(os.path.join(dirname, filename))
+    for filename in os.listdir(train_dir):
+        files.append(os.path.join(train_dir, filename))
+    print(files[0])
     img = mpimg.imread(files[0])
     imgplot = plt.imshow(img)
     plt.show()
