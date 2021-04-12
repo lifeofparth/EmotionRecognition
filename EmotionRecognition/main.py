@@ -3,11 +3,10 @@ import time
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import tensorflow as tf
+import keras 
 import numpy as np
 import pandas as pd
 import cv2
-from keras.models import Sequential, Model
-from keras.layers import Dense, Activation, Layer, Lambda
 from sklearn.model_selection import train_test_split
 
 def create_dataset(img_folder):
@@ -36,13 +35,37 @@ def create_dataset(img_folder):
             image /= 255
             # add pixel array to list
             img_data_array.append(image)
-        # add emotion to list
-        class_name.append(dir)
-    return img_data_array, class_name
+            # add emotion to list
+            class_name.append(dir)
+    return img_data_array, class_name, IMG_WIDTH, IMG_HEIGHT
+
+def create_target_dict(class_name):
+    target_dict = {k: v for v, k in enumerate(np.unique(class_name))}
+    target_val = [target_dict[class_name[i]] for i in range(len(class_name))]
+    return target_val
+
+def create_model(image_width, image_height):
+    model = keras.Sequential(
+        [
+         keras.layers.InputLayer(input_shape=(image_height,image_height,3)), 
+         keras.layers.Conv2D(filters=32, kerner_size=3, strides=(2,2), activation='relu'), 
+         keras.layers.Conv2D(filters=64, kernel_size=3, strides=(2,2), activation='relu'), 
+         keras.layers.Flatten(), 
+         keras.layers.Dense(6)
+        ])
+    encoder.compile(optimizer='rmsprop', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    return model 
+
+def train_model(learning_model, img_data, target_val):
+    history = learning_model.fit(
+        x = np.array(img_data, np.float32), 
+        y = np.array(list(map(int, target_val)), np.float32), epochs = 5
+        )
 
 if __name__ == '__main__':
-    #emotion = menu()
-    #show_image(emotion)
     # img_data is dataset of length 28,709 (that's how many training images there are)
     # img_data[0].shape is (48,48) each image has 256 pixel values between 0 and 1
-    img_data, class_name = create_dataset('../train')
+    img_data, class_name, image_width, image_height = create_dataset('../train')
+    target_val = create_target_dict(class_name)
+    learning_model = create_model(image_width, image_height)
+    train_model(learning_model, img_data, target_val)
