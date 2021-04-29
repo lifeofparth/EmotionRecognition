@@ -1,24 +1,24 @@
 import os 
 import time
+
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
+
 import tensorflow as tf
 
 import keras # program crashes with this import
 from keras.models import Sequential
-from keras.layers import Dense, Dropout, Activation, Flatten
-from keras.layers import Conv2D, MaxPooling2D
+from keras.layers import Dense, Dropout, Activation, Flatten, BatchNormalization, Conv2D, MaxPooling2D
 from keras.utils import np_utils
 
-import matplotlib.pyplot as plt
+import sklearn 
+from sklearn.metrics import classification_report 
+from sklearn.model_selection import train_test_split
+
 import numpy as np
 import pandas as pd
 import cv2
-from sklearn.model_selection import train_test_split
 import random
-
-# emotion Lables
-emotionNames = ['angry','disgust','fear','happy','neutral','sad','surprise']
 
 # extracts the labels and images for the emotions (angry, sad, etc...)
 # and each images width and height 48 x 48
@@ -73,7 +73,7 @@ def get_image_labels(class_name):
     return npLabels
 
 # using keras to develop the training model
-def create_model(train_images):
+def create_simple_model(train_images):
 
     model = Sequential()
 
@@ -110,7 +110,7 @@ def create_model(train_images):
     model.summary()
     return model
 
-def train_model(learning_model, train_data, train_label, test_data, test_label):
+def train_simple_model(learning_model, train_data, train_label, test_data, test_label):
     
     batch_size = 32
     # initiate RMSprop optimizer
@@ -120,7 +120,7 @@ def train_model(learning_model, train_data, train_label, test_data, test_label):
     history = learning_model.fit(train_data, train_label, batch_size=batch_size, epochs=5, validation_data=(test_data, test_label), shuffle=True)
     return history
 
-def perform_analytics(history):
+def perform_simple_analytics(history, learning_model, test_data, test_label):
 
     acc = history.history['accuracy']
     val_acc = history.history['val_accuracy']
@@ -142,10 +142,82 @@ def perform_analytics(history):
     plt.title('Training and Validation Loss')
     plt.show()
 
-    predictions = model_2.predict(x_test)
+    predictions = learning_model.predict(test_data)
     y_pred = np.argmax(predictions, axis=1)
-    report = classification_report(y_test, y_pred)
+
+    rounded_labels = np.argmax(test_label, axis=1)
+    report = classification_report(rounded_labels, y_pred)
     print(report)
+
+def process_images(image, label):
+
+    image = tf.image.per_image_standardization(image)
+    image = tf.image.resize(image, (227,227))
+    return image, label
+
+def create_alex_model(train_images, train_labels, test_images, test_labels):
+
+    # emotion Lables
+    emotionNames = ['angry','disgust','fear','happy','neutral','sad','surprise']
+    
+    # validation set
+    valid_images = train_images[:5000]
+    valid_labels = train_labels[:5000]
+
+    # training set
+    train_images = train_images[5000:]
+    train_labels = train_labels[5000:]
+
+    train_data = tf.data.Dataset.from_tensor_slices((train_images, train_labels))
+    test_data = tf.data.Dataset.from_tensor_slices((test_images, test_labels))
+    valid_data = tf.data.Dataset.from_tensor_slices((valid_images, valid_labels))
+
+    train_data_size = tf.data.experimental.cardinality(train_data).numpy()
+    test_data_size = tf.data.experimental.cardinality(test_data).numpy()
+    valid_data_size = tf.data.experimental.cardinality(valid_data).numpy()
+
+    train_data = (train_data
+                  .map(process_images)
+                  .shuffle(buffer_size=train_data_size)
+                  .batch(batch_size=32, drop_remainder=True))
+
+    test_data = (test_data
+                  .map(process_images)
+                  .shuffle(buffer_size=train_data_size)
+                  .batch(batch_size=32, drop_remainder=True))
+
+    valid_data = (valid_data
+                  .map(process_images)
+                  .shuffle(buffer_size=train_data_size)
+                  .batch(batch_size=32, drop_remainder=True))
+
+    model = keras.models.Sequential([
+        keras.layers.Conv2D(filters=96, kernel_size=(11,11), strides=(4,4), activation='relu', input_shape=(227,227,3)),
+        keras.layers.BatchNormalization(),
+        keras.layers.MaxPool2D(pool_size=(3,3), strides=(2,2)),
+        keras.layers.Conv2D(filters=256, kernel_size=(5,5), strides=(1,1), activation='relu', padding="same"),
+        keras.layers.BatchNormalization(),
+        keras.layers.MaxPool2D(pool_size=(3,3), strides=(2,2)),
+        keras.layers.Conv2D(filters=384, kernel_size=(3,3), strides=(1,1), activation='relu', padding="same"),
+        keras.layers.BatchNormalization(),
+        keras.layers.Conv2D(filters=384, kernel_size=(3,3), strides=(1,1), activation='relu', padding="same"),
+        keras.layers.BatchNormalization(),
+        keras.layers.Conv2D(filters=256, kernel_size=(3,3), strides=(1,1), activation='relu', padding="same"),
+        keras.layers.BatchNormalization(),
+        keras.layers.MaxPool2D(pool_size=(3,3), strides=(2,2)),
+        keras.layers.Flatten(),
+        keras.layers.Dense(4096, activation='relu'),
+        keras.layers.Dropout(0.5),
+        keras.layers.Dense(4096, activation='relu'),
+        keras.layers.Dropout(0.5),
+        keras.layers.Dense(7, activation='softmax')    
+    ])
+
+    model.compile(loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False), optimizer=tf.optimizers.SGD(lr=0.001), metrics=['accuracy'])
+    model.summary()
+
+    model.fit(train_data, epochs=5, validation_data=valid_data, validation_freq=1)
+    model.evaluate(test_data)
 
 if __name__ == '__main__':
 
@@ -164,17 +236,20 @@ if __name__ == '__main__':
 
     print("------------------------------------------")
 
-    print("Creating model...")
-    learning_model = create_model(train_img_data)
-    print("Model created...")
+    #print("Creating simple model...")
+    #learning_model_simple = create_simple_model(train_img_data)
+    #print("Simple model created...")
 
-    print("------------------------------------------")
+    #print("------------------------------------------")
 
-    print("Training model...")
-    history = train_model(learning_model, train_img_data, train_img_labels, test_img_data, test_img_labels)
-    print("Model training finished...")
+    #print("Training simple model...")
+    #history = train_simple_model(learning_model_simple, train_img_data, train_img_labels, test_img_data, test_img_labels)
+    #print("Simple model training finished...")
 
-    print("------------------------------------------")
+    #print("------------------------------------------")
 
-    print("Performing analytics...")
-    perform_analytics(history)
+    #print("Performing analytics on simple model...")
+    #perform_simple_analytics(history, learning_model_simple, test_img_data, test_img_labels)
+
+    print("Creating AlexNet model...")
+    learning_model_alex = create_alex_model(train_img_data, train_img_labels, test_img_data, test_img_labels)
