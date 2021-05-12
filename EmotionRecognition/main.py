@@ -10,9 +10,10 @@ import keras # program crashes with this import
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation, Flatten, BatchNormalization, Conv2D, MaxPooling2D
 from keras.utils import np_utils
+from keras.losses import CategoricalCrossentropy
 
 import sklearn 
-from sklearn.metrics import classification_report 
+from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay
 from sklearn.model_selection import train_test_split
 
 import numpy as np
@@ -77,21 +78,26 @@ def create_simple_model(train_images):
 
     model = Sequential()
 
-    model.add(Conv2D(32, 3, strides = 1, padding='same',
+    model.add(Conv2D(128, 3, strides = 1, padding='same',
                      input_shape=(train_images.shape[1:])))
     model.add(Activation('relu'))
+    model.add(Dropout(0.25))
 
     model.add(Conv2D(64, 3, strides = 1, padding='same'))
     model.add(Activation('relu'))
+    model.add(Dropout(0.25))
 
-    ## 2x2 max pooling reduces to 14 x 14 x 64
-    model.add(MaxPooling2D(pool_size=(2, 2)))
+    ## 4x4 max pooling reduces to 14 x 14 x 64
+    model.add(MaxPooling2D(pool_size=(3, 3)))
+    model.add(Dropout(0.25))
 
-    model.add(Conv2D(64, 3, strides = 1, padding='same'))
+    model.add(Conv2D(32, 3, strides = 1, padding='same'))
     model.add(Activation('relu'))
+    model.add(Dropout(0.25))
 
-    model.add(Conv2D(128, 3, strides = 1, padding='same'))
+    model.add(Conv2D(32, 3, strides = 1, padding='same'))
     model.add(Activation('relu'))
+    model.add(Dropout(0.25))
 
     ## 2x2 max pooling reduces to 14 x 14 x 64
     model.add(MaxPooling2D(pool_size=(2, 2)))
@@ -99,7 +105,8 @@ def create_simple_model(train_images):
 
     ## Flatten turns 14x14x64 into 12,544
     model.add(Flatten())
-    model.add(Dense(128))
+    model.add(Dense(32))
+    model.add(Dropout(0.05))
     model.add(Activation('relu'))
     model.add(Dense(7))
     model.add(Activation('softmax'))
@@ -114,10 +121,13 @@ def train_simple_model(learning_model, train_data, train_label, test_data, test_
     
     batch_size = 32
     # initiate RMSprop optimizer
-    opt = keras.optimizers.RMSprop(learning_rate=0.0005, decay=1e-6)
+    opt = keras.optimizers.RMSprop(learning_rate=0.001, decay=1e-6)
     # Let's train the model using RMSprop
     learning_model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
-    history = learning_model.fit(train_data, train_label, batch_size=batch_size, epochs=5, validation_data=(test_data, test_label), shuffle=True)
+    history = learning_model.fit(train_data, train_label, batch_size=batch_size, epochs=20, validation_data=(test_data, test_label), shuffle=True)
+    _, train_acc = learning_model.evaluate(train_data, train_label, verbose=0)
+    _, test_acc = learning_model.evaluate(test_data, test_label, verbose=0)
+    print('Train: %.3f, Test: %.3f' % (train_acc, test_acc))
     return history
 
 def perform_simple_analytics(history, learning_model, test_data, test_label):
@@ -126,9 +136,9 @@ def perform_simple_analytics(history, learning_model, test_data, test_label):
     val_acc = history.history['val_accuracy']
     loss = history.history['loss']
     val_loss = history.history['val_loss']
-    epochs_range = range(5)
+    epochs_range = range(20)
 
-    plt.figure(figsize=(15, 15))
+    plt.figure(figsize=(20, 20))
     plt.subplot(2, 2, 1)
     plt.plot(epochs_range, acc, label='Training Accuracy')
     plt.plot(epochs_range, val_acc, label='Validation Accuracy')
@@ -149,6 +159,11 @@ def perform_simple_analytics(history, learning_model, test_data, test_label):
     report = classification_report(rounded_labels, y_pred)
     print(report)
 
+    matrix = confusion_matrix(rounded_labels, y_pred)
+    print(matrix)
+    #displayMatrix = ConfusionMatrixDisplay(confusion_matrix=matrix, display_labels=['0', '1', '2', '3', '4', '5'])
+    #displayMatrix.plot()
+
 def process_images(image, label):
 
     image = tf.image.per_image_standardization(image)
@@ -158,66 +173,103 @@ def process_images(image, label):
 def create_alex_model(train_images, train_labels, test_images, test_labels):
 
     # emotion Lables
-    emotionNames = ['angry','disgust','fear','happy','neutral','sad','surprise']
+    #emotionNames = ['angry','disgust','fear','happy','neutral','sad','surprise']
     
     # validation set
-    valid_images = train_images[:5000]
-    valid_labels = train_labels[:5000]
+    #valid_images = train_images[:5000]
+    #valid_labels = train_labels[:5000]
 
     # training set
-    train_images = train_images[5000:]
-    train_labels = train_labels[5000:]
+    #train_images = train_images[5000:]
+    #train_labels = train_labels[5000:]
 
     train_data = tf.data.Dataset.from_tensor_slices((train_images, train_labels))
     test_data = tf.data.Dataset.from_tensor_slices((test_images, test_labels))
-    valid_data = tf.data.Dataset.from_tensor_slices((valid_images, valid_labels))
+    #valid_data = tf.data.Dataset.from_tensor_slices((valid_images, valid_labels))
 
     train_data_size = tf.data.experimental.cardinality(train_data).numpy()
     test_data_size = tf.data.experimental.cardinality(test_data).numpy()
-    valid_data_size = tf.data.experimental.cardinality(valid_data).numpy()
+    #valid_data_size = tf.data.experimental.cardinality(valid_data).numpy()
 
     train_data = (train_data
                   .map(process_images)
                   .shuffle(buffer_size=train_data_size)
-                  .batch(batch_size=32, drop_remainder=True))
+                  .batch(batch_size=2, drop_remainder=True))
 
     test_data = (test_data
                   .map(process_images)
                   .shuffle(buffer_size=train_data_size)
-                  .batch(batch_size=32, drop_remainder=True))
+                  .batch(batch_size=2, drop_remainder=True))
 
-    valid_data = (valid_data
-                  .map(process_images)
-                  .shuffle(buffer_size=train_data_size)
-                  .batch(batch_size=32, drop_remainder=True))
+    #valid_data = (valid_data
+     #             .map(process_images)
+      #            .shuffle(buffer_size=train_data_size)
+       #           .batch(batch_size=2, drop_remainder=True))
 
     model = keras.models.Sequential([
-        keras.layers.Conv2D(filters=96, kernel_size=(11,11), strides=(4,4), activation='relu', input_shape=(227,227,3)),
-        keras.layers.BatchNormalization(),
+        keras.layers.Conv2D(filters=32, kernel_size=(9,9), strides=(4,4), activation='relu', input_shape=(227,227,3)),
         keras.layers.MaxPool2D(pool_size=(3,3), strides=(2,2)),
-        keras.layers.Conv2D(filters=256, kernel_size=(5,5), strides=(1,1), activation='relu', padding="same"),
         keras.layers.BatchNormalization(),
+        keras.layers.Conv2D(filters=64, kernel_size=(5,5), strides=(1,1), activation='relu', padding="same"),
         keras.layers.MaxPool2D(pool_size=(3,3), strides=(2,2)),
-        keras.layers.Conv2D(filters=384, kernel_size=(3,3), strides=(1,1), activation='relu', padding="same"),
         keras.layers.BatchNormalization(),
-        keras.layers.Conv2D(filters=384, kernel_size=(3,3), strides=(1,1), activation='relu', padding="same"),
-        keras.layers.BatchNormalization(),
-        keras.layers.Conv2D(filters=256, kernel_size=(3,3), strides=(1,1), activation='relu', padding="same"),
-        keras.layers.BatchNormalization(),
+        keras.layers.Conv2D(filters=128, kernel_size=(3,3), strides=(1,1), activation='relu', padding="same"),
+        keras.layers.Conv2D(filters=128, kernel_size=(3,3), strides=(1,1), activation='relu', padding="same"),
+        keras.layers.Conv2D(filters=64, kernel_size=(3,3), strides=(1,1), activation='relu', padding="same"),
         keras.layers.MaxPool2D(pool_size=(3,3), strides=(2,2)),
         keras.layers.Flatten(),
-        keras.layers.Dense(4096, activation='relu'),
+        keras.layers.Dense(512, activation='relu'),
         keras.layers.Dropout(0.5),
-        keras.layers.Dense(4096, activation='relu'),
+        keras.layers.Dense(256, activation='relu'),
         keras.layers.Dropout(0.5),
         keras.layers.Dense(7, activation='softmax')    
     ])
 
-    model.compile(loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False), optimizer=tf.optimizers.SGD(lr=0.001), metrics=['accuracy'])
+    opt = keras.optimizers.SGD(learning_rate=0.005)
+
+    model.compile(loss=CategoricalCrossentropy(from_logits=False), optimizer=opt, metrics=['accuracy'])
     model.summary()
 
-    model.fit(train_data, epochs=5, validation_data=valid_data, validation_freq=1)
-    model.evaluate(test_data)
+    history = model.fit(train_data, epochs=2, validation_data=test_data, validation_freq=1)
+    print(len(test_data))
+    print(test_data)
+
+    _, train_acc = model.evaluate(train_data, verbose=0)
+    _, test_acc = model.evaluate(test_data, verbose=0)
+    print('Train: %.3f, Test: %.3f' % (train_acc, test_acc))
+
+    acc = history.history['accuracy']
+    val_acc = history.history['val_accuracy']
+    loss = history.history['loss']
+    val_loss = history.history['val_loss']
+    epochs_range = range(2)
+
+    plt.figure(figsize=(20, 20))
+    plt.subplot(2, 2, 1)
+    plt.plot(epochs_range, acc, label='Training Accuracy')
+    plt.plot(epochs_range, val_acc, label='Validation Accuracy')
+    plt.legend(loc='lower right')
+    plt.title('Training and Validation Accuracy')
+
+    plt.subplot(2, 2, 2)
+    plt.plot(epochs_range, loss, label='Training Loss')
+    plt.plot(epochs_range, val_loss, label='Validation Loss')
+    plt.legend(loc='upper right')
+    plt.title('Training and Validation Loss')
+    plt.show()
+
+    images = test_data.numpy()
+    print(images[0].shape)
+    #predictions = model.predict(test_data[0])
+    #y_pred = np.argmax(predictions, axis=1)
+
+    #rounded_labels = np.argmax(test_labels, axis=1)
+    #report = classification_report(rounded_labels, y_pred)
+    #print(report)
+
+    #emotionNames = [0, 1, 2, 3, 4, 5, 6]
+    #matrix = confusion_matrix(rounded_labels, y_pred)
+    #print(matrix)
 
 if __name__ == '__main__':
 
@@ -234,7 +286,7 @@ if __name__ == '__main__':
     test_img_data, test_img_labels = load_dataset('../test')
     print("Testing dataset has been loaded...")
 
-    print("------------------------------------------")
+    #print("------------------------------------------")
 
     #print("Creating simple model...")
     #learning_model_simple = create_simple_model(train_img_data)
