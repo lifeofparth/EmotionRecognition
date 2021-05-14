@@ -260,7 +260,7 @@ if __name__ == '__main__':
     test_img_data, test_img_labels = load_dataset('../test')
     print("Testing dataset has been loaded...")
 
-    print("------------------------------------------")
+    #print("------------------------------------------")
 
     print("Creating simple model...")
     learning_model_simple = create_simple_model(train_img_data)
